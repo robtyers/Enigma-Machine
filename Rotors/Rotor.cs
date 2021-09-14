@@ -11,7 +11,6 @@ namespace Enigma.Rotors
 
         public LetterRing LetterRing { get; }
 
-
         public Rotor()
         {
             LetterRing = new LetterRing();

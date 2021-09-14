@@ -3,9 +3,13 @@ namespace Enigma.Rotors.EnigmaD
 {
     public class III : CipherWheel
     {
-        public III(int rotorOffset = 1) : base(rotorOffset)
+        public III()
         {
             RotorNumber = "III";
+        }
+        public override void Initialise(int ringSetting, char startPosition)
+        {
+            SetRingSetting(ringSetting);
             
             Substitute('A', 'C');
             Substitute('B', 'J');
@@ -35,6 +39,7 @@ namespace Enigma.Rotors.EnigmaD
             Substitute('Z', 'E');
 
             SetNotch('V');
+            SetStartPosition(startPosition);
         }
     }
 }

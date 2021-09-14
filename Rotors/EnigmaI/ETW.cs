@@ -1,4 +1,3 @@
-using System.Linq;
 
 namespace Enigma.Rotors.EnigmaI
 {

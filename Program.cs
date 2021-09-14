@@ -1,106 +1,56 @@
 ﻿using System;
-using System.Text;
-using System.Text.RegularExpressions;
+using System.IO;
 using Enigma.Machine;
-using Enigma.Rotors.EnigmaI;
+using Enigma.Rotors;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Enigma
 {
     class Program
     {
-        static ScramblerUnit _scramblerUnit;
+        static ServiceProvider _serviceProvider;
 
         static void Main(string[] args)
         {
-            var entryWheel = new ETW();
-
-            var slowOffset = GetRingSetting("Slow");
-            var slowPosition = GetStartPosition("Slow");
-            var slowRotor = new I(slowOffset);
-            slowRotor.StartPosition(slowPosition);
-
-            var mediumOffset = GetRingSetting("Medium");
-            var mediumRotor = new II(mediumOffset);
-            var mediumPosition = GetStartPosition("Medium");
-            mediumRotor.StartPosition(mediumPosition);
-
-            var fastOffset = GetRingSetting("Fast");
-            var fastRotor = new III(fastOffset);
-            var fastPosition = GetStartPosition("Fast");
-            fastRotor.StartPosition(fastPosition);
-
-            var reflector = new ReflectorB();//UKW();
-
-            var wheelOrder = new WheelOrder(
-                    entryWheel, 
-                    slowRotor, 
-                    mediumRotor, 
-                    fastRotor, 
-                    reflector);
-                    
-            _scramblerUnit = new ScramblerUnit(wheelOrder);
-            
-            WriteLine(_scramblerUnit.ToString());
-
-            var cipherText = new StringBuilder();
-            while(true)
-            {
-                var clearText = ReadClearText();
-                var substitute = _scramblerUnit.Encipher(clearText);
-                cipherText.Append(substitute);
-
-                WriteLine(_scramblerUnit.ToString());
-                WriteCipher(cipherText.ToString());
-            }
+            RegisterServices();
+            IServiceScope scope = _serviceProvider.CreateScope();
+            scope.ServiceProvider.GetRequiredService<ConsoleApplication>().Run();
+            DisposeServices();
         }
 
-        static char ReadClearText()
+        private static void RegisterServices()
         {
-            Write("Input: ");
-            var clearText = Console.ReadKey().KeyChar;
-                if(!char.IsLetter(clearText))
-                    throw new ArgumentOutOfRangeException("Text must be A-Z");
+            var services = new ServiceCollection();
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appSettings.json", optional: false)
+                .Build();
 
-            Console.WriteLine();
-            return char.ToUpper(clearText);
+            services.AddLogging(config =>
+                {
+                    _ = config.AddConfiguration(configuration.GetSection("Logging"))
+                            .AddConsole()
+                            .AddDebug();
+                });
+
+            services.Configure<Enigma.Machine.EnigmaB.RotorSettings>(configuration.GetSection("RotorSettings"));
+
+            services.AddSingleton<IRotorFactory, Enigma.Rotors.EnigmaI.RotorFactory>();
+            services.AddSingleton<IScramblerUnit, Enigma.Machine.EnigmaB.ScramblerUnit>();
+            services.AddSingleton<ConsoleApplication>();
+
+            _serviceProvider = services.BuildServiceProvider(true);
         }
 
-        static int GetRingSetting(string rotorName)
+        private static void DisposeServices()
         {
-            Write($"{rotorName} Ring Setting [1-26]: ");
-            var rotorOffset = int.Parse(Console.ReadKey().KeyChar.ToString());
-            WriteLine(string.Empty);
+            if (_serviceProvider == null)
+                return;
 
-            if(rotorOffset < 1 || rotorOffset > 26)
-                throw new ArgumentOutOfRangeException("Offset must be between 1 and 26");
-
-            return rotorOffset;
-        }
-
-        static char GetStartPosition(string rotorName)
-        {
-            Write($"{rotorName} Start Position [A-Z]: ");
-            var position = char.ToUpper(Console.ReadKey().KeyChar);
-            WriteLine(string.Empty);
-
-            if(position < 65 || position > 90)
-                throw new ArgumentOutOfRangeException("Position must be between A and Z");
-
-            return position;
-        }
-
-        static void Write(string message)
-        {
-            Console.Write(message);
-        }
-
-        static void WriteLine(string message)
-        {
-            Console.WriteLine(message);
-        }
-        static void WriteCipher(string cipherText)
-        {
-            Console.WriteLine(Regex.Replace(cipherText, ".{5}", "$0 "));
+            if (_serviceProvider is IDisposable)
+                ((IDisposable)_serviceProvider).Dispose();
         }
     }
 }

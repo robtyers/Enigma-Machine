@@ -7,11 +7,15 @@ namespace Enigma.Rotors
     {
         public event EventHandler StepNext;
     
+        public CipherWheel(){}
+
+        public abstract void Initialise(int ringSetting, char startPosition);
+
         Letter CurrentLetter => LetterRing[0];
 
         public char CurrentValue => CurrentLetter.Value;
 
-        public int RingSetting { get; }
+        public int RingSetting { get; private set; }
 
         protected virtual void OnStep(EventArgs e)
         {
@@ -19,12 +23,28 @@ namespace Enigma.Rotors
             handler?.Invoke(this, e);
         }
 
-        public CipherWheel(int ringSetting)
+        protected void SetRingSetting(int ringSetting)
         {
             if(ringSetting < 1 || ringSetting > 26)
                 throw new ArgumentOutOfRangeException("Ring setting must be between 1 and 26");
 
             RingSetting = ringSetting;
+        }
+
+        protected void SetStartPosition(char letter)
+        {
+            letter = Char.ToUpper(letter);
+            
+            if(!LetterRing.Any(l => l.Value == letter))
+                throw new MissingMemberException($"{RotorNumber}: {letter} not found.");
+            
+            do
+            {
+                MoveNext();
+                
+                if(CurrentLetter.Value == letter)
+                    break;
+            } while(true);
         }
 
         public void Step(bool trigger = false)
@@ -40,22 +60,6 @@ namespace Enigma.Rotors
             var currentLetter = CurrentLetter;
             LetterRing.RemoveAt(0);
             LetterRing.Add(currentLetter);
-        }
-
-        public void StartPosition(char letter)
-        {
-            letter = Char.ToUpper(letter);
-            
-            if(!LetterRing.Any(l => l.Value == letter))
-                throw new MissingMemberException($"{RotorNumber}: {letter} not found.");
-            
-            do
-            {
-                MoveNext();
-                
-                if(CurrentLetter.Value == letter)
-                    break;
-            } while(true);
         }
 
         protected char ApplyRingSetting(char value)

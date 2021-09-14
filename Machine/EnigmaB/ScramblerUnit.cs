@@ -3,24 +3,34 @@ using System;
 using System.Linq;
 using System.Text;
 using Enigma.Rotors;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
-namespace Enigma.Machine
+namespace Enigma.Machine.EnigmaB
 {
-    public class ScramblerUnit
+    public class ScramblerUnit : IScramblerUnit
     {
-        public IEntryDisk EntryDisk;
-        public ICipherWheel FastRotor;
-        public ICipherWheel MediumRotor;
-        public ICipherWheel SlowRotor;
-        public IReflector Reflector;
+        public string ModelNumber { get; }
+        readonly RotorSettings _rotorSettings;
+        readonly ILogger<ScramblerUnit> _logger;
+        public IEntryDisk EntryDisk { get; }
+        public ICipherWheel FastRotor { get; }
+        public ICipherWheel MediumRotor { get; }
+        public ICipherWheel SlowRotor { get; }
+        public IReflector Reflector { get; }
 
-        public ScramblerUnit(WheelOrder wheelOrder)
+        public ScramblerUnit(IOptions<RotorSettings> rotorSettings, ILogger<ScramblerUnit> logger, IRotorFactory rotorFactory)
         {
-            EntryDisk = wheelOrder.EntryDisk;
-            SlowRotor = wheelOrder.Slow;
-            MediumRotor = wheelOrder.Medium;
-            FastRotor = wheelOrder.Fast;
-            Reflector = wheelOrder.Reflector;
+            ModelNumber = "A27";
+
+            _rotorSettings = rotorSettings.Value;
+            _logger = logger;
+
+            EntryDisk = rotorFactory.GetEntryDisk;
+            Reflector = rotorFactory.GetReflector;
+            SlowRotor = rotorFactory.Rotors.Single(r => r.RotorNumber == _rotorSettings.SlowRotor);
+            MediumRotor = rotorFactory.Rotors.Single(r => r.RotorNumber == _rotorSettings.MediumRotor);
+            FastRotor = rotorFactory.Rotors.Single(r => r.RotorNumber == _rotorSettings.FastRotor);
 
             FastRotor.StepNext += MediumStep;
             MediumRotor.StepNext += SlowStep;
@@ -28,35 +38,39 @@ namespace Enigma.Machine
 
         public char Encipher(char letter)
         {
+            var sb = new StringBuilder();
+
             FastStep();
-            
+
             var position = letter.ToInt();
-            Console.WriteLine(Explain(EntryDisk, position));
+            sb.AppendLine(Explain(EntryDisk, position));
             position = EntryDisk.RightToLeft(position);
 
-            Console.WriteLine(Explain(FastRotor, position));
+            sb.AppendLine(Explain(FastRotor, position));
             position = FastRotor.RightToLeft(position);
 
-            Console.WriteLine(Explain(MediumRotor, position));
+            sb.AppendLine(Explain(MediumRotor, position));
             position = MediumRotor.RightToLeft(position);
 
-            Console.WriteLine(Explain(SlowRotor, position));
+            sb.AppendLine(Explain(SlowRotor, position));
             position = SlowRotor.RightToLeft(position);
 
-            Console.WriteLine(Explain(Reflector, position));
+            sb.AppendLine(Explain(Reflector, position));
             position = Reflector.RightToLeft(position);
 
-            Console.WriteLine(Explain(SlowRotor, position, true));
+            sb.AppendLine(Explain(SlowRotor, position, true));
             position = SlowRotor.LeftToRight(position);
 
-            Console.WriteLine(Explain(MediumRotor, position, true));
+            sb.AppendLine(Explain(MediumRotor, position, true));
             position = MediumRotor.LeftToRight(position);
 
-            Console.WriteLine(Explain(FastRotor, position, true));
+            sb.AppendLine(Explain(FastRotor, position, true));
             position = FastRotor.LeftToRight(position);
 
-            Console.WriteLine(Explain(EntryDisk, position, true));
+            sb.AppendLine(Explain(EntryDisk, position, true));
             position = EntryDisk.LeftToRight(position);
+
+            _logger.LogDebug(sb.ToString());
 
             return position.ToChar();
         }
